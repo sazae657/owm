@@ -127,20 +127,21 @@ static const Bool resizehints = True;
 		_selfmon = _mons;
 		_selfmon = [self winToMon :_root];
 	}
+	fprintf(stderr, "updateGeom SW=%d SH=%d\n", _sw, _sh);
 	
 	return dirty;	
 }
 
 -updateBorders
 {
-	Monitor *m;
+/*	Monitor *m;
 	XSetWindowAttributes wa;
 
 	wa.override_redirect = True;
 	wa.background_pixmap = ParentRelative;
 	wa.event_mask = ButtonPressMask|ExposureMask;
 	for (m = _mons; m; m = m->next) {
-		m->barwin = 
+		 m->barwin = 
 			XCreateWindow(_display, 
 				_root, m->wx, m->by, m->ww, _bh, 0, 
 				DefaultDepth(_display, _screen),
@@ -149,7 +150,9 @@ static const Bool resizehints = True;
 		      	CWOverrideRedirect|CWBackPixmap|CWEventMask, &wa);
 		//XDefineCursor(dpy, m->barwin, cursor[CurNormal]);
 		XMapRaised(_display, m->barwin);
+		fprintf(stderr, "updateBorder:wx=%d ww=%d\n", m->wx, m->ww);
 	}
+	*/
 	return self;
 }
 
@@ -161,6 +164,7 @@ static const Bool resizehints = True;
 	Client *c;
 	XRectangle r = { _dc.x, _dc.y, _dc.w, _dc.h };
 	
+	fprintf(stderr, "drawBar:wx=%d ww=%d\n", m->wx, m->ww);
 
 }
 
@@ -168,13 +172,13 @@ static const Bool resizehints = True;
 {
 	int x;
 	XGCValues gcv;
-	XRectangle r = { dc.x, dc.y, dc.w, dc.h };
+	XRectangle r = { _dc.x, _dc.y, _dc.w, _dc.h };
 
 	gcv.foreground = _dc.sel[ColBorder];
 	XChangeGC(_display, _dc.gc, GCForeground, &gcv);
 		
-	r.x = dc.x + 1;
-	r.y = dc.y + 1;
+	r.x = _dc.x + 1;
+	r.y = _dc.y + 1;
 	if(filled) {
 		r.width = r.height = x + 1;
 		XFillRectangles(_display, _dc.drawable, _dc.gc, &r, 1);
@@ -327,7 +331,7 @@ static const Bool resizehints = True;
 		//	clearurgent(c);
 		[[self detachStack :c] attachStack :c];
 		// grabbuttons(c, True);
-		XSetWindowBorder(_display, c->win, _dc.sel[ColBorder]);
+		//XSetWindowBorder(_display, c->win, _dc.sel[ColBorder]);
 		XSetInputFocus(_display, c->win, RevertToPointerRoot, CurrentTime);	
 	}
 	else {
@@ -430,7 +434,7 @@ static const Bool resizehints = True;
 		wc.sibling = m->barwin;
 		for(c = m->stack; c; c = c->snext)
 			if(!c->isfloating && ISVISIBLE(c)) {
-				XConfigureWindow(_display, c->win, CWSibling|CWStackMode, &wc);
+				//XConfigureWindow(_display, c->win, CWSibling|CWStackMode, &wc);
 				wc.sibling = c->win;
 			}
 	}
@@ -452,7 +456,7 @@ static const Bool resizehints = True;
 	}
 	else {
 		[self showhide :c->snext];
-		XMoveWindow(_display, c->win, c->x + 2 * _sw, c->y);
+		//XMoveWindow(_display, c->win, c->x + 2 * _sw, c->y);
 	}
 	return self;
 }
@@ -542,7 +546,7 @@ static const Bool resizehints = True;
 	c->oldw = c->w; c->w = wc.width = w;
 	c->oldh = c->h; c->h = wc.height = h;
 	wc.border_width = c->bw;
-	XConfigureWindow(_display, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
+	//XConfigureWindow(_display, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
 	[self configure :c];
 	XSync(_display, False);
 	return self;
@@ -581,6 +585,11 @@ static const Bool resizehints = True;
 	c->h = c->oldh = wa->height;
 	c->oldbw = wa->border_width;
 	
+	fprintf(stderr, "geom: x=%d y=%d w=%d h=%d\n", c->x, c->y, c->w, c->h);
+	if (1 == c->w) c->w += 320;
+	if (1 == c->h) c->h += 240;
+
+
 	if (c->w == c->mon->mw && c->h == c->mon->mh) {
 		c->isfloating = 1;
 		c->x = c->mon->mx;
@@ -598,8 +607,8 @@ static const Bool resizehints = True;
 		c->bw = 8;
 	}
 	wc.border_width = c->bw;
-	XConfigureWindow(_display, w, CWBorderWidth, &wc);
-	XSetWindowBorder(_display, w, _dc.norm[ColBorder]);
+	//XConfigureWindow(_display, w, CWBorderWidth, &wc);
+	//XSetWindowBorder(_display, w, _dc.norm[ColBorder]);
 	[[self configure :c] updatesizehints :c];
 	XSelectInput(_display, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	if(!c->isfloating)
@@ -607,7 +616,8 @@ static const Bool resizehints = True;
 	if(c->isfloating)
 		XRaiseWindow(_display, c->win);
 	[[self attach :c] attachStack :c];
-	XMoveResizeWindow(_display, c->win, c->x + 2 * _sw, c->y, c->w, c->h); /* some windows require this */
+	fprintf(stderr, "geom(recomp): x=%d y=%d w=%d h=%d\n", c->x, c->y, c->w, c->h);
+	XMoveResizeWindow(_display, c->win, c->x, c->y, c->w, c->h); 
 	XMapWindow(_display, c->win);
 	[self arrange :c->mon];
 	return self;
@@ -694,6 +704,22 @@ static const Bool resizehints = True;
 	fprintf(stderr, "init SW=%d SH=%d\n", _sw, _sh);
 	return self;
 }
+
+-onMapRequest :(XEvent*)e
+{
+	static XWindowAttributes wa;
+	XMapRequestEvent *ev = &e->xmaprequest;
+
+	if(!XGetWindowAttributes(_display, ev->window, &wa))
+			return self;
+	if(wa.override_redirect)
+			return self;
+	if(![self winToClient :ev->window]) {
+		[self manage :ev->window :&wa];
+	}
+	return self;
+}
+
 -run 
 {
 	XEvent ev;
@@ -722,6 +748,7 @@ static const Bool resizehints = True;
 			case MappingNotify:
 				fprintf(stderr,"Xe=MappingNotify\n"); break;
 			case MapRequest:
+				[self onMapRequest :&ev];
 				fprintf(stderr,"Xe=MapRequest\n"); break;
 			case PropertyNotify:
 				fprintf(stderr,"Xe=PropertyNotify\n"); break;

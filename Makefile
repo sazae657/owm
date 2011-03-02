@@ -1,6 +1,6 @@
 .SUFFIXES: .o .m
 
-CC=gcc45
+CC=gcc
 TARGET=owm
 
 CFLAGS=-g -Wno-import -I/usr/include/X11
@@ -8,7 +8,7 @@ LFLAGS=
 LIBS=-lobjc -lXm -lXt
 OBJDIR=build
 
-SRCS=Main.m OwmCore.m OwmWindow.m
+SRCS=Main.m OwmCore.m OwmWindow.m OwmScreen.m
 O1=$(SRCS:%.m=%.o)
 OBJS=$(O1:%=$(OBJDIR)/%)
 

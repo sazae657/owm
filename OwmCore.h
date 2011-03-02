@@ -49,6 +49,8 @@ typedef struct {
 -detach:(Client*)c;
 -detachStack:(Client*)c;
 
+-onMapRequest:(XEvent*)e;
+
 -drawsquare :(Bool)filled :(Bool)empty :(Bool) invert :(unsigned long) col;
 -drawbar :(Monitor*)m;
 -updateBarpos :(Monitor*)m;
