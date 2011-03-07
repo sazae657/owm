@@ -8,7 +8,7 @@ LFLAGS=
 LIBS=-lobjc -lXm -lXt
 OBJDIR=build
 
-SRCS=Main.m OwmCore.m OwmWindow.m OwmScreen.m
+SRCS=Main.m OwmCore.m OwmWindow.m OwmScreen.m OwmClient.m OwmUtList.m
 O1=$(SRCS:%.m=%.o)
 OBJS=$(O1:%=$(OBJDIR)/%)
 

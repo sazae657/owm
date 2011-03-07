@@ -1,22 +1,29 @@
 #import "Xlocal.h"
 #import <objc/Object.h>
+#import "OwmCore.h"
+#import "OwmScreen.h"
 #import "OwmClient.h"
+#import "OwmUtList.h"
+#import "OwmTypes.h"
+
+@class OwmCore;
+
 @interface OwmScreen : Object
 {
-	int mx;
-	int my;
-	int mw;
-	int mh;
-	OwmCore	  *mgr;
-	OwmClient *clients;
-	OwmClient *sel;
-	OwmClient *stack;
-	OwmScreen *next;
+	OwmRect _rect;
+	OwmCore	  *_core;
+	OwmUtList *_clients;
 }
 
--init :(OwmCore*) mgr;
--initWithWindow :(Window*)win;
--initWithAxis :(int)x :(int)y;
+-(Bool)isHitCursor :(int)x :(int)y;
+-initWith :(OwmCore*) mgr;
+-initWithWindow :(OwmCore*) core :(Window)win;
+-initWithAxis :(OwmCore*) core :(int)x :(int)y;
+
+-(OwmRect*)getRect;
+
+-(OwmUtList*)getClients;
 
 @end
+
 

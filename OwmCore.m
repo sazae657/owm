@@ -1,5 +1,7 @@
 #import "Xlocal.h"
+#import "OwmScreen.h"
 #import "OwmCore.h"
+#import "OwmUtList.h"
 
 static const char normbordercolor[] = "#cccccc";
 static const char normbgcolor[]     = "#cccccc";
@@ -7,12 +9,6 @@ static const char normfgcolor[]     = "#000000";
 static const char selbordercolor[]  = "#0066ff";
 static const char selbgcolor[]      = "#0066ff";
 static const char selfgcolor[]      = "#ffffff";
-static const Layout layouts[] = {
-	/* symbol     arrange function */
-	{ "[]=",      NULL},    /* first entry is default */
-	{ "><>",      NULL },    /* no layout function means floating behavior */
-	{ "[M]",      NULL },
-};
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define INRECT(X,Y,RX,RY,RW,RH) ((X) >= (RX) && (X) < (RX) + (RW) && (Y) >= (RY) && (Y) < (RY) + (RH))
 #define MAX(A, B)               ((A) > (B) ? (A) : (B))
@@ -23,6 +19,25 @@ static const Layout layouts[] = {
 #define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
 
 static const Bool resizehints = True; 
+static char* atom_names[] = {
+	"_MIT_PRIORITY_COLORS",
+	"WM_CHANGE_STATE",
+	"WM_STATE",
+	"WM_COLORMAP_WINDOWS",
+	"WM_PROTOCOLS",
+	"WM_TAKE_FOCUS",
+	"WM_SAVE_YOURSELF",
+	"WM_DELETE_WINDOW",
+	"SM_CLIENT_ID",
+	"WM_CLIENT_LEADER",
+	"WM_WINDOW_ROLE"
+};
+static char* net_atom_names[] = {
+	"_NET_SUPPORTED",
+	"_NET_WM_NAME",
+	"_NET_WM_STATE",
+	"_NET_WM_STATE_FULLSCREEN"
+};
 
 @implementation OwmCore
 
@@ -30,102 +45,56 @@ static const Bool resizehints = True;
 {
 	_display = disp;
 	_mons = NULL;
-	_selfmon = NULL;
+	_prmScr = NULL;
 	return [self createWm];
 }
 
--(Monitor*)createMon
-{	
-	Monitor* m = NULL;
-	if(!(m = (Monitor*)calloc(1, sizeof(Monitor)))) {
-		fprintf(stderr ,"fatal: could not malloc() %u bytes\n", sizeof(Monitor));
-		return NULL;
-	}
-	m->tagset[0] = m->tagset[1] = 1;
-	m->mfact = 0.55;
-	m->showbar = True;
-	m->topbar = True;
-	m->lt[0] = &layouts[0];
-	m->lt[1] = &layouts[1 % LENGTH(layouts)];
-	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
-	return m;
-}
-
--updateBarpos :(Monitor*)m
+-(OwmClient*)findClient :(Window)w
 {
-	m->wy = m->my;
-	m->wh = m->mh;
-	if(m->showbar) {
-		m->wh -= _bh;
-		m->by = m->topbar ? m->wy : m->wy + m->wh;
-		m->wy = m->topbar ? m->wy + _bh : m->wy;
-	}
-	else {
-		m->by = -_bh;
-	}
-	return self;
-}
--(Monitor*)ptrToMon :(int)x :(int)y
-{
-	Monitor *m;
-	for(m = _mons; m; m = m->next) {
-		if(INRECT(x, y, m->wx, m->wy, m->ww, m->wh)) {
-			return m;
-		}
-	}
-	return _selfmon;
-}
-
--(Client*)winToClient :(Window)w
-{
-	Client *c;
-	Monitor *m;
-	for(m = _mons; m; m = m->next) {
-		for (c = m->clients; c; c = c->next) {
-			if(c->win == w) {
-				return w;
+	OwmUtList *c;
+	OwmUtList *m;
+	for (m = _mons; NULL != m; m = [m next]) {
+		for (c = [[m get] getClients]; NULL != c; c = [c next]) {
+			if([[c get] getWindow] == w) {
+				return [c get];
 			}
 		}
 	}
 	return NULL;
 }
 
--(Monitor*)winToMon :(Window)w
+-(OwmUtList*)screenList
 {
-	int x, y;
-	Client *c;
-	Monitor *m;
-	
-	if (w == _root && [self getRootPointer :&x :&y]) {
-		return [self ptrToMon :x :y];
-	}
+	return [_mons reset];
+}
 
-	for (m = _mons; m; m = m->next) {
-		if(w == m->barwin) {
-			return m;
-		}
-	}
-	if((c = [self winToClient :w])) {
-		return c->mon;
-	}
-	return _selfmon; 
+-(OwmScreen*)firstScreen
+{
+	return [_mons first];
+}
 
+-(Window)rootWindow
+{
+	return _root;
 }
 
 -(Bool)updateGeom
 {
 	Bool dirty = False;
-	if(!_mons)
-		_mons = [self createMon];
-	if (_mons->mw != _sw || _mons->mh != _sh) {
+	if(!_mons) {
+		_mons = [[OwmUtList alloc] init];
+		[_mons add :[[OwmScreen alloc] initWith :self]];
+	}
+	OwmRect* rc = [[_mons get] getRect];
+	if (rc->w != _sw || rc->h != _sh) {
 		dirty = True;
-		_mons->mw = _mons->ww = _sw;
-		_mons->mh = _mons->wh = _sh;
-		[self updateBarpos :_mons];
+		rc->w = _sw;
+		rc->h = rc->h = _sh;
+		//[self updateBarpos :_mons];
 	}
 	if(dirty) {
-		_selfmon = _mons;
-		_selfmon = [self winToMon :_root];
+		//_prmScr = _mons;
+		_prmScr = [[OwmScreen alloc] initWithWindow :self :_root];
 	}
 	fprintf(stderr, "updateGeom SW=%d SH=%d\n", _sw, _sh);
 	
@@ -156,39 +125,6 @@ static const Bool resizehints = True;
 	return self;
 }
 
--drawbar :(Monitor*)m
-{
-	int x;
-	unsigned int i, occ = 0, urg = 0;
-	unsigned long *col;
-	Client *c;
-	XRectangle r = { _dc.x, _dc.y, _dc.w, _dc.h };
-	
-	fprintf(stderr, "drawBar:wx=%d ww=%d\n", m->wx, m->ww);
-
-}
-
--drawsquare :(Bool)filled :(Bool)empty :(Bool) invert :(unsigned long) col
-{
-	int x;
-	XGCValues gcv;
-	XRectangle r = { _dc.x, _dc.y, _dc.w, _dc.h };
-
-	gcv.foreground = _dc.sel[ColBorder];
-	XChangeGC(_display, _dc.gc, GCForeground, &gcv);
-		
-	r.x = _dc.x + 1;
-	r.y = _dc.y + 1;
-	if(filled) {
-		r.width = r.height = x + 1;
-		XFillRectangles(_display, _dc.drawable, _dc.gc, &r, 1);
-	}
-	else if(empty) {
-		r.width = r.height = x;
-		XDrawRectangles(_display, _dc.drawable, _dc.gc, &r, 1);
-	}
-	return self;
-}
 
 -(long)getWindowLong :(Window)w
 {
@@ -198,7 +134,8 @@ static const Bool resizehints = True;
 	unsigned long n, extra;
 	Atom real;
 	
-	if(XGetWindowProperty(_display, w, _wmatom[WMState], 0L, 2L, False, _wmatom[WMState],
+	if(XGetWindowProperty(_display, w, 
+				_wmatom[Xs_WM_STATE], 0L, 2L, False, _wmatom[Xs_WM_STATE],
 		 &real, &format, &n, &extra, (unsigned char **)&p) != Success) {
 		return -1;
 	}
@@ -233,10 +170,10 @@ static const Bool resizehints = True;
 	XFree(name.value);
 	return True;
 }
-
+/*
 -updateTitle :(Client*)c
 {
-	if (![self getWindowText :c->win :_netatom[NetWMName] :c->name :sizeof(c->name)]) {
+	if (![self getWindowText :c->win :_netatom[Xn_NET_WM_NAME] :c->name :sizeof(c->name)]) {
 		[self getWindowText :c->win :XA_WM_NAME :c->name :sizeof(c->name)];
 	}
 	if (c->name[0] == '\0') {
@@ -244,7 +181,7 @@ static const Bool resizehints = True;
 	}
 	return self;
 }
-
+*/
 -updatesizehints :(Client*)c  
 {
 	long msize;
@@ -296,25 +233,9 @@ static const Bool resizehints = True;
 	return self;
 }
 
--configure:(Client*)c
-{
-	XConfigureEvent ce;
 
-	ce.type = ConfigureNotify;
-	ce.display = _display;
-	ce.event = c->win;
-	ce.window = c->win;
-	ce.x = c->x;
-	ce.y = c->y;
-	ce.width = c->w;
-	ce.height = c->h;
-	ce.border_width = c->bw;
-	ce.above = None;
-	ce.override_redirect = False;
-	XSendEvent(_display, c->win, False, StructureNotifyMask, (XEvent *)&ce);
-	return self;
-}
 
+#if 0
 -focus :(Client*)c
 {
 	if(!c || !ISVISIBLE(c)) {
@@ -551,76 +472,16 @@ static const Bool resizehints = True;
 	XSync(_display, False);
 	return self;
 }
+#endif
 
--manage :(Window)w :(XWindowAttributes*)wa
+-(Display*)getDisplay
 {
-	static Client cz;
-	Client *c, *t = NULL;
-	Window trans = None;
-	XWindowChanges wc;
-	
-	if(!(c = (Client*)malloc(sizeof(Client)))) {
-		fprintf(stderr, "manage alloc failed\n");
-		return self;
-	}
-	*c = cz;
-	c->win = w;
-	[self updateTitle :c];
-	
-	if(XGetTransientForHint(_display, w, &trans)) {
-		t = [self winToClient :trans];	
-	}
-	if(t) {
-		c->mon = t->mon;
-		c->tags = t->tags;
-	}
-	else {
-		c->mon = _selfmon;
-	}
+	return _display;
+}
 
-	/* geometry */
-	c->x = c->oldx = wa->x + c->mon->wx;
-	c->y = c->oldy = wa->y + c->mon->wy;
-	c->w = c->oldw = wa->width;
-	c->h = c->oldh = wa->height;
-	c->oldbw = wa->border_width;
-	
-	fprintf(stderr, "geom: x=%d y=%d w=%d h=%d\n", c->x, c->y, c->w, c->h);
-	if (1 == c->w) c->w += 320;
-	if (1 == c->h) c->h += 240;
-
-
-	if (c->w == c->mon->mw && c->h == c->mon->mh) {
-		c->isfloating = 1;
-		c->x = c->mon->mx;
-		c->y = c->mon->my;
-		c->bw = 0;
-	}
-	else {
-		if(c->x + WIDTH(c) > c->mon->mx + c->mon->mw)
-			c->x = c->mon->mx + c->mon->mw - WIDTH(c);
-		if(c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
-			c->y = c->mon->my + c->mon->mh - HEIGHT(c);
-		c->x = MAX(c->x, c->mon->mx);
-		c->y = MAX(c->y, ((c->mon->by == 0) && (c->x + (c->w / 2) >= c->mon->wx)
-				&& (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? _bh : c->mon->my);
-		c->bw = 8;
-	}
-	wc.border_width = c->bw;
-	//XConfigureWindow(_display, w, CWBorderWidth, &wc);
-	//XSetWindowBorder(_display, w, _dc.norm[ColBorder]);
-	[[self configure :c] updatesizehints :c];
-	XSelectInput(_display, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
-	if(!c->isfloating)
-		c->isfloating = c->oldstate = trans != None || c->isfixed;
-	if(c->isfloating)
-		XRaiseWindow(_display, c->win);
-	[[self attach :c] attachStack :c];
-	fprintf(stderr, "geom(recomp): x=%d y=%d w=%d h=%d\n", c->x, c->y, c->w, c->h);
-	XMoveResizeWindow(_display, c->win, c->x, c->y, c->w, c->h); 
-	XMapWindow(_display, c->win);
-	[self arrange :c->mon];
-	return self;
+-(Atom)getNetAtom:(int)name
+{
+	return _netatom[name];
 }
 
 -scan
@@ -641,7 +502,7 @@ static const Bool resizehints = True;
 		}
 		if (wa.map_state == IsViewable || 
 			[self getWindowLong :wins[i]] == IconicState) {
-				[self manage :wins[i] :&wa];
+				[[OwmClient alloc] initWithAttach :self  :wins[i] :&wa];
 		}
 	}
 	for(i = 0; i < num; i++) {
@@ -650,7 +511,7 @@ static const Bool resizehints = True;
 		}
 		if (XGetTransientForHint(_display, wins[i], &d1) &&
 			(wa.map_state == IsViewable || [self getWindowLong :wins[i]] == IconicState)) {
-			[self manage: wins[i] :&wa];
+				[[OwmClient alloc] initWithAttach :self  :wins[i] :&wa];
 		}
 	}
 	if (wins) {
@@ -670,14 +531,12 @@ static const Bool resizehints = True;
 	_sh = DisplayHeight(_display, _screen);
 	_bh = 24;
 	[self updateGeom];
-	_wmatom[WMProtocols] = XInternAtom(_display, "WM_PROTOCOLS", False);
-	_wmatom[WMDelete] = XInternAtom(_display, "WM_DELETE_WINDOW", False);
-	_wmatom[WMState] = XInternAtom(_display, "WM_STATE", False);
-	_netatom[NetSupported] = XInternAtom(_display, "_NET_SUPPORTED", False);
-	_netatom[NetWMName] = XInternAtom(_display, "_NET_WM_NAME", False);
-	_netatom[NetWMState] = XInternAtom(_display, "_NET_WM_STATE", False);
-	_netatom[NetWMFullscreen] = XInternAtom(_display, "_NET_WM_STATE_FULLSCREEN", False);
+	XInternAtoms(_display, 
+			atom_names, sizeof _wmatom / sizeof _wmatom[0], False, _wmatom);
+	XInternAtoms(_display, 
+			net_atom_names, sizeof _netatom / sizeof _netatom[0], False, _netatom);
 
+	
 	_dc.norm[ColBorder] = [self createColor :normbordercolor];
 	_dc.norm[ColBG] = [self createColor :normbgcolor];
 	_dc.norm[ColFG] = [self createColor :normfgcolor];
@@ -692,8 +551,8 @@ static const Bool resizehints = True;
 	XSetLineAttributes(_display, _dc.gc, 1, LineSolid, CapButt, JoinMiter);
 
 	[self updateBorders];
-	XChangeProperty(_display, _root, _netatom[NetSupported], XA_ATOM, 32,
-						PropModeReplace, (unsigned char *) _netatom, NetLast);
+	XChangeProperty(_display, _root, _netatom[Xn_NET_SUPPORTED], XA_ATOM, 32,
+						PropModeReplace, (unsigned char *) _netatom, Xn_NET_MAX);
 
 	wa.cursor = XCreateFontCursor(_display, XC_left_ptr);
 	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
@@ -714,8 +573,8 @@ static const Bool resizehints = True;
 			return self;
 	if(wa.override_redirect)
 			return self;
-	if(![self winToClient :ev->window]) {
-		[self manage :ev->window :&wa];
+	if(![self findClient :ev->window]) {
+		 [[OwmClient alloc] initWithAttach :self :ev->window :&wa];
 	}
 	return self;
 }
