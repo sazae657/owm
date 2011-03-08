@@ -63,6 +63,19 @@ static char* net_atom_names[] = {
 	return NULL;
 }
 
+-(OwmClient*)findClientByFrame :(Window)w
+{
+	OwmUtList *c;
+	OwmUtList *m;
+	for (m = _mons; NULL != m; m = [m next]) {
+		for (c = [[m get] getClients]; NULL != c; c = [c next]) {
+			if([[c get] getFrame] == w) {
+				return [c get];
+			}
+		}
+	}
+	return NULL;
+}
 -(OwmUtList*)screenList
 {
 	return [_mons reset];
@@ -489,6 +502,8 @@ static char* net_atom_names[] = {
 	unsigned int i, num;
 	Window d1, d2, *wins = NULL;
 	XWindowAttributes wa;
+	OwmClient *cl = NULL;
+	OwmUtList *lst = [[_mons get] getClients];
 
 	if (0 == XQueryTree(_display, _root, &d1, &d2, &wins, &num)) {
 		fprintf(stderr, "XQueryTree fail\n");
@@ -502,7 +517,7 @@ static char* net_atom_names[] = {
 		}
 		if (wa.map_state == IsViewable || 
 			[self getWindowLong :wins[i]] == IconicState) {
-				[[OwmClient alloc] initWithAttach :self  :wins[i] :&wa];
+			[lst add :[[OwmClient alloc] initWithAttach :self  :wins[i] :&wa]];
 		}
 	}
 	for(i = 0; i < num; i++) {
@@ -510,8 +525,9 @@ static char* net_atom_names[] = {
 			continue;
 		}
 		if (XGetTransientForHint(_display, wins[i], &d1) &&
-			(wa.map_state == IsViewable || [self getWindowLong :wins[i]] == IconicState)) {
-				[[OwmClient alloc] initWithAttach :self  :wins[i] :&wa];
+			(wa.map_state == IsViewable || [self getWindowLong :wins[i]] == IconicState)) 
+		{
+			[lst add :[[OwmClient alloc] initWithAttach :self  :wins[i] :&wa]];
 		}
 	}
 	if (wins) {
@@ -555,28 +571,75 @@ static char* net_atom_names[] = {
 						PropModeReplace, (unsigned char *) _netatom, Xn_NET_MAX);
 
 	wa.cursor = XCreateFontCursor(_display, XC_left_ptr);
-	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
-	                |EnterWindowMask|LeaveWindowMask|StructureNotifyMask
-	                |PropertyChangeMask;
+	wa.event_mask = SubstructureRedirectMask 
+					| SubstructureNotifyMask | ColormapChangeMask
+					| ButtonPressMask | ButtonReleaseMask | PropertyChangeMask;
+	                
 	XChangeWindowAttributes(_display, _root, CWEventMask|CWCursor, &wa);
+	XSync(_display, False);
 	XSelectInput(_display, _root, wa.event_mask);
+	_activeClient = NULL;
 	fprintf(stderr, "init SW=%d SH=%d\n", _sw, _sh);
 	return self;
+}
+
+-(unsigned long) getColor :(int)index
+{
+	return _dc.norm[index];
 }
 
 -onMapRequest :(XEvent*)e
 {
 	static XWindowAttributes wa;
 	XMapRequestEvent *ev = &e->xmaprequest;
+	OwmUtList* lst = [[_mons get] getClients];
 
 	if(!XGetWindowAttributes(_display, ev->window, &wa))
 			return self;
 	if(wa.override_redirect)
 			return self;
 	if(![self findClient :ev->window]) {
-		 [[OwmClient alloc] initWithAttach :self :ev->window :&wa];
+		[lst add :[[OwmClient alloc] initWithAttach :self :ev->window :&wa]];
 	}
 	return self;
+}
+
+-onMouseButtonPress:(XEvent*)e
+{
+	XButtonEvent *ev = &e->xbutton;
+	OwmClient* c;
+	_activeClient = NULL;	
+	if (NULL == (c = [self findClientByFrame: ev->window])) {
+		fprintf(stderr, "frame not match\n");
+	}
+	else {
+		fprintf(stderr, "frame found\n");
+		_activeClient = c;
+		[_activeClient grabStart];
+	}
+}
+-onMouseButtonRelease:(XEvent*)e
+{
+	if (_activeClient) {
+		[_activeClient grabEnd];
+		_activeClient = NULL;
+	}
+}
+
+-onConfigureRequest:(XEvent*)e
+{
+	XConfigureRequestEvent *ev = &e->xconfigurerequest;
+	XWindowAttributes wa;
+	OwmClient *c = [self findClient :ev->window];
+	if(c) {
+		fprintf(stderr, "ConfigureRequest: match\n");
+		[c configure];
+		return self;
+	}
+	OwmUtList* lst = [[_mons get] getClients];
+	XGetWindowAttributes(_display, ev->window, &wa);
+	fprintf(stderr, "ConfigureRequest: not match\n");
+	[lst add :[[OwmClient alloc] initWithAttach :self :ev->window :&wa]];
 }
 
 -run 
@@ -587,10 +650,15 @@ static char* net_atom_names[] = {
 		switch(ev.type)
 		{
 			case ButtonPress:
+				[self onMouseButtonPress :&ev];
 				fprintf(stderr,"Xe=ButtonPress\n"); break;
+			case ButtonRelease:
+				[self onMouseButtonRelease :&ev];
+				fprintf(stderr,"Xe=ButtonRelease\n"); break;
 			case ClientMessage:
 				fprintf(stderr,"Xe=ClientMessage\n"); break;
 			case ConfigureRequest:
+				[self onConfigureRequest :&ev];
 				fprintf(stderr,"Xe=ConfigureRequest\n"); break;
 			case ConfigureNotify:
 				fprintf(stderr,"Xe=ConfigureNotify\n"); break;

@@ -17,12 +17,20 @@
 	Bool isfixed, isfloating, isurgent, oldstate;
 	OwmScreen *mon;
 	OwmCore	  *_core;
+	
+	Window	  _frame;
 	Window	  _win;
 }
 -(OwmScreen*)getScreen;
 -configure;
+-createWmBorder;
 -(Window)getWindow;
+-(Window)getFrame;
 -initWithAttach :(OwmCore*)core :(Window)w :(XWindowAttributes*)wa;
 -(Bool)getWindowText :(char *)text :(unsigned int) size;
+
+-grabStart;
+-grabEnd;
+
 @end
 

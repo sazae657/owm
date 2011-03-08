@@ -23,6 +23,7 @@
 	//OwmScreen	*_mons;
 	OwmScreen	*_prmScr;
 	OwmUtList	*_mons;
+	OwmClient	*_activeClient;
 }
 
 -init :(Display*) disp;
@@ -33,14 +34,18 @@
 //-attachStack:(Client*)c;
 //-detach:(Client*)c;
 //-detachStack:(Client*)c;
-
+-(unsigned long) getColor :(int)index;
 -(OwmUtList*)screenList;
 -(OwmScreen*)firstScreen;
 -(Window)rootWindow;
 -(Display*)getDisplay;
 -(OwmClient*)findClient :(Window)w;
+-(OwmClient*)findClientByFrame :(Window)w;
 -(Atom)getNetAtom:(int)name;
 -onMapRequest:(XEvent*)e;
+-onMouseButtonPress:(XEvent*)e;
+-onMouseButtonRelease:(XEvent*)e;
+-onConfigureRequest:(XEvent*)e;
 
 //-drawsquare :(Bool)filled :(Bool)empty :(Bool) invert :(unsigned long) col;
 //-drawbar :(Monitor*)m;

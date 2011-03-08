@@ -15,6 +15,11 @@
 	return _win;
 }
 
+-(Window)getFrame
+{
+	return _frame;
+}
+
 -(Bool)getWindowText :(char *)text :(unsigned int) size
 {
 	char **list = NULL;
@@ -77,8 +82,8 @@
 	_wndRect.h = _oldRect.h = wa->height;
 	
 	fprintf(stderr, "geom: x=%d y=%d w=%d h=%d\n", _wndRect.x, _wndRect.y, _wndRect.w, _wndRect.h);
-	//if (1 == w) w += 320;
-	//if (1 == h) h += 240;
+	if (1 == _wndRect.w) _wndRect.w += 320;
+	if (1 == _wndRect.h) _wndRect.h += 240;
 	
 	bw = 9;
 #if 0
@@ -103,9 +108,9 @@
 	//XConfigureWindow(_display, w, CWBorderWidth, &wc);
 	//XSetWindowBorder(_display, w, _dc.norm[ColBorder]);
 	[self configure];
-	XSelectInput([_core getDisplay], 
-			w, 
-			EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+	//XSelectInput([_core getDisplay], 
+	//		w, 
+	//		EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	if(!isfloating)
 		isfloating = oldstate = trans != None || isfixed;
 	if(isfloating)
@@ -115,9 +120,33 @@
 			_wndRect.x, _wndRect.y, _wndRect.w, _wndRect.h);
 	XMoveResizeWindow([core getDisplay], _win, 
 			_wndRect.x, _wndRect.y, _wndRect.w, _wndRect.h); 
-	XMapWindow([core getDisplay], _win);
+	[self createWmBorder];
+	//XMapWindow([core getDisplay], _win);
 	//[self arrange :c->mon];
 	return self;
+}
+
+-createWmBorder
+{
+	XSetWindowAttributes wa;
+	_frame = XCreateSimpleWindow(
+			[_core getDisplay], [_core rootWindow],
+			_wndRect.x,
+			_wndRect.y - 20,
+			_wndRect.w ,
+			_wndRect.h + 20 ,
+			10, [_core getColor :ColFG], [_core getColor :ColBG]);
+	wa.cursor = XCreateFontCursor([_core getDisplay], XC_left_ptr);
+	wa.event_mask = SubstructureRedirectMask 
+					| SubstructureNotifyMask | ColormapChangeMask
+					| ButtonPressMask | ButtonReleaseMask | PropertyChangeMask;
+	XChangeWindowAttributes([_core getDisplay], _frame, CWEventMask|CWCursor, &wa);
+	XSelectInput([_core getDisplay], _frame, wa.event_mask);
+	
+	XSetWindowBorderWidth([_core getDisplay], _win, 0);
+	XReparentWindow([_core getDisplay], _win, _frame, 19, 19);
+	XMapWindow([_core getDisplay], _win);
+	XMapWindow([_core getDisplay], _frame);
 }
 
 -configure
@@ -148,12 +177,33 @@
 	_oldRect.y = _wndRect.y; _wndRect.y = wc.y = y;
 	_oldRect.w = _wndRect.w; _wndRect.w = wc.width = w;
 	_oldRect.h = _wndRect.h; _wndRect.h = wc.height = h;
-	wc.border_width = c->bw;
+	wc.border_width = 1;
 	XConfigureWindow([_core getDisplay], 
 			_win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
 	[self configure];
 	XSync([_core getDisplay], False);
 	return self;
 }
+
+-grabStart
+{
+	Cursor cursor = XCreateFontCursor([_core getDisplay], XC_hand1 );
+	XGrabPointer([_core getDisplay], 
+			_frame, 
+			False, 
+			ButtonPressMask|ButtonReleaseMask|ButtonMotionMask,
+			GrabModeAsync,GrabModeAsync, None, cursor, CurrentTime);
+}
+
+-grabEnd
+{	
+	int x,y;
+	XUngrabPointer([_core getDisplay], CurrentTime);
+	
+	[_core getRootPointer :&x :&y];
+	XMoveWindow([_core getDisplay], _frame , x, y);
+
+}
+
 @end
 
