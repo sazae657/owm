@@ -248,44 +248,36 @@ static char* net_atom_names[] = {
 
 
 
-#if 0
--focus :(Client*)c
+
+-focus :(OwmClient*)c
 {
-	if(!c || !ISVISIBLE(c)) {
-		for(c = _selfmon->stack; c && !ISVISIBLE(c); c = c->snext);
-	}
-	if(_selfmon->sel && _selfmon->sel != c) {
-		[self unfocus :_selfmon->sel :False];
-	}
 	if(c) {
-		if(c->mon != _selfmon) {
-			_selfmon = c->mon;	
-		}
 		//if(c->isurgent)
 		//	clearurgent(c);
-		[[self detachStack :c] attachStack :c];
 		// grabbuttons(c, True);
 		//XSetWindowBorder(_display, c->win, _dc.sel[ColBorder]);
-		XSetInputFocus(_display, c->win, RevertToPointerRoot, CurrentTime);	
+		XMapRaised(_display, [c getFrame]);
+		//XRaiseWindow(_display, [c getFrame]);
+		XSetInputFocus(_display, [c getWindow], RevertToPointerRoot, CurrentTime);	
 	}
 	else {
 		XSetInputFocus(_display, _root, RevertToPointerRoot, CurrentTime);
 	}
-	_selfmon->sel = c;
 	return self;
 }
 
--unfocus :(Client*)c :(Bool)setfocus
+-unfocus :(OwmClient*)c :(Bool)setfocus
 {
 	if(!c) return self;
 	//grabbuttons(c, False);
-	XSetWindowBorder(_display, c->win, _dc.norm[ColBorder]);
+	//XSetWindowBorder(_display, [c getwin, _dc.norm[ColBorder]);
 	if (setfocus) {
 		XSetInputFocus(_display, _root, RevertToPointerRoot, CurrentTime);
 	}
 	return self;
 }
 
+#if 0
 -attach:(Client*)c
 {
 	c->next = c->mon->clients;
@@ -611,12 +603,16 @@ static char* net_atom_names[] = {
 	_activeClient = NULL;	
 	if (NULL == (c = [self findClientByFrame: ev->window])) {
 		fprintf(stderr, "frame not match\n");
+		if(NULL == (c = [self findClient: ev->window])) {
+			fprintf(stderr, "client not match\n");
+		}
+		return self;
 	}
-	else {
-		fprintf(stderr, "frame found\n");
-		_activeClient = c;
-		[_activeClient grabStart];
-	}
+	
+	fprintf(stderr, "frame found\n");
+	_activeClient = c;
+	[self focus :_activeClient];
+	[_activeClient grabStart];
 }
 -onMouseButtonRelease:(XEvent*)e
 {

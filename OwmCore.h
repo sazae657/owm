@@ -62,8 +62,8 @@
 -(Bool)getWindowText :(Window)w :(Atom)atom :(char *)text :(unsigned int) size;
 //-updatesizehints :(Client*)c;
 //-updateTitle :(Client*)c;
-//-focus :(Client*)c;
-//-unfocus :(Client*)c :(Bool)setfocus;
+-focus :(OwmClient*)c;
+-unfocus :(OwmClient*)c :(Bool)setfocus;
 -scan;
 -run;
 -(Bool)getRootPointer :(int*)x :(int*)y;

@@ -30,7 +30,9 @@
 	else {
 		rec->prev = _end;
 		_end->next = rec;
-		_end->prev->next = rec;
+		if(_end->prev) {
+			_end->prev->next = rec;
+		}
 		_end = rec;
 	}
 	return self;
