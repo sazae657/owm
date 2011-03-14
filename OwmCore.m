@@ -76,6 +76,7 @@ static char* net_atom_names[] = {
 	}
 	return NULL;
 }
+
 -(OwmUtList*)screenList
 {
 	return [_mons reset];
@@ -114,31 +115,6 @@ static char* net_atom_names[] = {
 	return dirty;	
 }
 
--updateBorders
-{
-/*	Monitor *m;
-	XSetWindowAttributes wa;
-
-	wa.override_redirect = True;
-	wa.background_pixmap = ParentRelative;
-	wa.event_mask = ButtonPressMask|ExposureMask;
-	for (m = _mons; m; m = m->next) {
-		 m->barwin = 
-			XCreateWindow(_display, 
-				_root, m->wx, m->by, m->ww, _bh, 0, 
-				DefaultDepth(_display, _screen),
-		        CopyFromParent, 
-				DefaultVisual(_display, _screen),
-		      	CWOverrideRedirect|CWBackPixmap|CWEventMask, &wa);
-		//XDefineCursor(dpy, m->barwin, cursor[CurNormal]);
-		XMapRaised(_display, m->barwin);
-		fprintf(stderr, "updateBorder:wx=%d ww=%d\n", m->wx, m->ww);
-	}
-	*/
-	return self;
-}
-
-
 -(long)getWindowLong :(Window)w
 {
 	int format;
@@ -158,31 +134,6 @@ static char* net_atom_names[] = {
 	XFree(p);
 	return result;
 }
--(Bool)getWindowText :(Window)w :(Atom)atom :(char *)text :(unsigned int) size
-{
-	char **list = NULL;
-	int n;
-	XTextProperty name;
-
-	if(!text || size == 0)
-		return False;
-	text[0] = '\0';
-	XGetTextProperty(_display, w, &name, atom);
-	if(!name.nitems)
-		return False;
-	if(name.encoding == XA_STRING)
-		strncpy(text, (char *)name.value, size - 1);
-	else {
-		if(XmbTextPropertyToTextList(_display, &name, &list, &n) >= Success && n > 0 && *list) {
-			strncpy(text, *list, size - 1);
-			XFreeStringList(list);
-		}
-	}
-	text[size - 1] = '\0';
-	fprintf(stderr, "GWT=%s\n", text);
-	XFree(name.value);
-	return True;
-}
 /*
 -updateTitle :(Client*)c
 {
@@ -195,59 +146,6 @@ static char* net_atom_names[] = {
 	return self;
 }
 */
--updatesizehints :(Client*)c  
-{
-	long msize;
-	XSizeHints size;
-
-	if(!XGetWMNormalHints(_display, c->win, &size, &msize))
-		/* size is uninitialized, ensure that size.flags aren't used */
-		size.flags = PSize;
-	if(size.flags & PBaseSize) {
-		c->basew = size.base_width;
-		c->baseh = size.base_height;
-	}
-	else if(size.flags & PMinSize) {
-		c->basew = size.min_width;
-		c->baseh = size.min_height;
-	}
-	else
-		c->basew = c->baseh = 0;
-	if(size.flags & PResizeInc) {
-		c->incw = size.width_inc;
-		c->inch = size.height_inc;
-	}
-	else
-		c->incw = c->inch = 0;
-	if(size.flags & PMaxSize) {
-		c->maxw = size.max_width;
-		c->maxh = size.max_height;
-	}
-	else
-		c->maxw = c->maxh = 0;
-	if(size.flags & PMinSize) {
-		c->minw = size.min_width;
-		c->minh = size.min_height;
-	}
-	else if(size.flags & PBaseSize) {
-		c->minw = size.base_width;
-		c->minh = size.base_height;
-	}
-	else
-		c->minw = c->minh = 0;
-	if(size.flags & PAspect) {
-		c->mina = (float)size.min_aspect.y / size.min_aspect.x;
-		c->maxa = (float)size.max_aspect.x / size.max_aspect.y;
-	}
-	else
-		c->maxa = c->mina = 0.0;
-	c->isfixed = (c->maxw && c->minw && c->maxh && c->minh
-	             && c->maxw == c->minw && c->maxh == c->minh);
-	return self;
-}
-
-
-
 
 -focus :(OwmClient*)c
 {
@@ -489,6 +387,11 @@ static char* net_atom_names[] = {
 	return _netatom[name];
 }
 
+-(Atom)getWmAtom:(int)name
+{
+	return _wmatom[name];
+}
+
 -scan
 {
 	unsigned int i, num;
@@ -558,7 +461,7 @@ static char* net_atom_names[] = {
 	_dc.gc = XCreateGC(_display, _root, 0, NULL);
 	XSetLineAttributes(_display, _dc.gc, 1, LineSolid, CapButt, JoinMiter);
 
-	[self updateBorders];
+	//[self updateBorders];
 	XChangeProperty(_display, _root, _netatom[Xn_NET_SUPPORTED], XA_ATOM, 32,
 						PropModeReplace, (unsigned char *) _netatom, Xn_NET_MAX);
 
@@ -585,13 +488,18 @@ static char* net_atom_names[] = {
 	static XWindowAttributes wa;
 	XMapRequestEvent *ev = &e->xmaprequest;
 	OwmUtList* lst = [[_mons get] getClients];
-
+	
+	OwmClient* cl = NULL;
 	if(!XGetWindowAttributes(_display, ev->window, &wa))
 			return self;
 	if(wa.override_redirect)
 			return self;
-	if(![self findClient :ev->window]) {
+	if(NULL == (cl = [self findClient :ev->window])) {
 		[lst add :[[OwmClient alloc] initWithAttach :self :ev->window :&wa]];
+	}
+	else {
+		XMapRaised(_display, [cl getFrame]);
+		XMapWindow(_display, [cl getWindow]);
 	}
 	return self;
 }
@@ -601,6 +509,10 @@ static char* net_atom_names[] = {
 	XButtonEvent *ev = &e->xbutton;
 	OwmClient* c;
 	_activeClient = NULL;	
+	if(_root == ev->window) {
+		fprintf(stderr, "root windows hit\n");
+	}
+
 	if (NULL == (c = [self findClientByFrame: ev->window])) {
 		fprintf(stderr, "frame not match\n");
 		if(NULL == (c = [self findClient: ev->window])) {
@@ -629,13 +541,26 @@ static char* net_atom_names[] = {
 	OwmClient *c = [self findClient :ev->window];
 	if(c) {
 		fprintf(stderr, "ConfigureRequest: match\n");
-		[c configure];
+		[c configure :ev];
 		return self;
 	}
 	OwmUtList* lst = [[_mons get] getClients];
 	XGetWindowAttributes(_display, ev->window, &wa);
 	fprintf(stderr, "ConfigureRequest: not match\n");
-	[lst add :[[OwmClient alloc] initWithAttach :self :ev->window :&wa]];
+	OwmClient *cl = [[[OwmClient alloc] initWithAttach :self :ev->window :&wa] configure:ev]; 
+	[lst add :cl];
+}
+
+-onUnmapNotify:(XEvent*)e
+{
+	XUnmapEvent *ev = &e->xunmap;
+	OwmClient* c = [self findClient :ev->window];
+	if(NULL == c) {
+		fprintf(stderr, "UnmapNotify: not match\n");
+	}
+	else {
+		fprintf(stderr, "UnmapNotify: match\n");
+	}
 }
 
 -run 
@@ -676,6 +601,7 @@ static char* net_atom_names[] = {
 			case PropertyNotify:
 				fprintf(stderr,"Xe=PropertyNotify\n"); break;
 			case UnmapNotify:
+				[self onUnmapNotify :&ev];
 				fprintf(stderr,"Xe=UnmapNotify\n"); break;
 			default:
 				fprintf(stderr,"Xe=%d\n",ev.type); break;

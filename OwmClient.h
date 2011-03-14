@@ -22,12 +22,15 @@
 	Window	  _win;
 }
 -(OwmScreen*)getScreen;
--configure;
+-sendConfigure;
+-configure :(XConfigureRequestEvent*)e;
 -createWmBorder;
 -(Window)getWindow;
 -(Window)getFrame;
 -initWithAttach :(OwmCore*)core :(Window)w :(XWindowAttributes*)wa;
 -(Bool)getWindowText :(char *)text :(unsigned int) size;
+
+-sendClientMessage:(Atom)at :(long)x;
 
 -grabStart;
 -grabEnd;

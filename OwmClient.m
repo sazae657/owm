@@ -107,7 +107,7 @@
 	wc.border_width = bw;
 	//XConfigureWindow(_display, w, CWBorderWidth, &wc);
 	//XSetWindowBorder(_display, w, _dc.norm[ColBorder]);
-	[self configure];
+	[self sendConfigure];
 	//XSelectInput([_core getDisplay], 
 	//		w, 
 	//		EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
@@ -140,16 +140,18 @@
 	wa.event_mask = SubstructureRedirectMask 
 					| SubstructureNotifyMask | ColormapChangeMask
 					| ButtonPressMask | ButtonReleaseMask | PropertyChangeMask;
+	//wa.event_mask = SubstructureRedirectMask | SubstructureNotifyMask;
 	XChangeWindowAttributes([_core getDisplay], _frame, CWEventMask|CWCursor, &wa);
 	XSelectInput([_core getDisplay], _frame, wa.event_mask);
 	
 	XSetWindowBorderWidth([_core getDisplay], _win, 0);
 	XReparentWindow([_core getDisplay], _win, _frame, 19, 19);
+	XAddToSaveSet([_core getDisplay], _win);
 	XMapWindow([_core getDisplay], _win);
 	XMapWindow([_core getDisplay], _frame);
 }
 
--configure
+-sendConfigure
 {
 	XConfigureEvent ce;
 
@@ -169,6 +171,38 @@
 	return self;
 }
 
+-configure :(XConfigureRequestEvent*)e
+{
+	fprintf(stderr, "configure f=%x w=%x e->xywh=[%d %d %d %d]\n", 
+			_frame, _win,
+			e->x, e->y, e->width, e->height
+			);
+
+	XWindowChanges wc;
+	if (_win == e->window) {
+		wc.x = _wndRect.x;
+		wc.y = _wndRect.y;
+		wc.width = _wndRect.w;
+		wc.height = _wndRect.h;
+		wc.border_width = 1;
+		wc.sibling = e->above;
+		wc.stack_mode = e->detail;
+		XConfigureWindow([_core getDisplay], e->parent, e->value_mask, &wc);
+		[self sendConfigure];
+	}
+	
+	wc.x = _wndRect.x;
+	wc.y = _wndRect.y;    
+	wc.width = e->width;
+	wc.height = e->height;
+	wc.border_width = 0;
+	wc.sibling = e->above;
+	wc.stack_mode = e->detail;
+	e->value_mask |= CWBorderWidth;
+	XConfigureWindow([_core getDisplay], e->window, e->value_mask, &wc);
+	return self;
+}
+
 -resize :(int)x :(int)y :(int)w :(int) h
 {
 	XWindowChanges wc;
@@ -179,8 +213,8 @@
 	_oldRect.h = _wndRect.h; _wndRect.h = wc.height = h;
 	wc.border_width = 1;
 	XConfigureWindow([_core getDisplay], 
-			_win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
-	[self configure];
+			_frame, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
+	[self sendConfigure];
 	XSync([_core getDisplay], False);
 	return self;
 }
@@ -188,11 +222,13 @@
 -grabStart
 {
 	Cursor cursor = XCreateFontCursor([_core getDisplay], XC_hand1 );
-	XGrabPointer([_core getDisplay], 
+	
+	 XGrabPointer([_core getDisplay], 
 			_frame, 
 			False, 
 			ButtonPressMask|ButtonReleaseMask|ButtonMotionMask,
 			GrabModeAsync,GrabModeAsync, None, cursor, CurrentTime);
+	XMapRaised([_core getDisplay], _frame);
 }
 
 -grabEnd
@@ -202,8 +238,37 @@
 	
 	[_core getRootPointer :&x :&y];
 	XMoveWindow([_core getDisplay], _frame , x, y);
-
+	XMapSubwindows([_core getDisplay], _frame);
+	[self sendClientMessage 
+		:[_core getWmAtom :Xs_WM_PROTOCOLS]
+		:[_core getWmAtom :Xs_WM_TAKE_FOCUS]];
+	return self;
 }
+
+-sendClientMessage:(Atom)at :(long)x
+{
+    XEvent ev;
+    int status;
+    long mask;
+
+    memset(&ev, 0, sizeof(ev));
+    ev.xclient.type = ClientMessage;
+    ev.xclient.window = _win;
+    ev.xclient.message_type = at;
+    ev.xclient.format = 32;
+    ev.xclient.data.l[0] = x;
+    ev.xclient.data.l[1] = CurrentTime;
+    mask = 0L;
+    
+	if (_win == [_core rootWindow]) {
+        mask = SubstructureRedirectMask; 
+	}
+    status = XSendEvent([_core getDisplay], _win, False, mask, &ev);
+    if (status == 0) {
+        fprintf(stderr, "sendClientMessage failed\n");
+	}
+}
+
 
 @end
 

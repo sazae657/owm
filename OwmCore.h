@@ -42,10 +42,12 @@
 -(OwmClient*)findClient :(Window)w;
 -(OwmClient*)findClientByFrame :(Window)w;
 -(Atom)getNetAtom:(int)name;
+-(Atom)getWmAtom:(int)name;
 -onMapRequest:(XEvent*)e;
 -onMouseButtonPress:(XEvent*)e;
 -onMouseButtonRelease:(XEvent*)e;
 -onConfigureRequest:(XEvent*)e;
+-onUnmapNotify:(XEvent*)e;
 
 //-drawsquare :(Bool)filled :(Bool)empty :(Bool) invert :(unsigned long) col;
 //-drawbar :(Monitor*)m;
@@ -59,7 +61,7 @@
 //-resizeclient :(Client*)c :(int)x :(int)y :(int)w :(int) h;
 //-(Bool)applySizeHints :(Client*) c :(int*)x :(int*)y :(int*)w :(int*)h :(Bool)interact;
 -(long)getWindowLong :(Window)w;
--(Bool)getWindowText :(Window)w :(Atom)atom :(char *)text :(unsigned int) size;
+//-(Bool)getWindowText :(Window)w :(Atom)atom :(char *)text :(unsigned int) size;
 //-updatesizehints :(Client*)c;
 //-updateTitle :(Client*)c;
 -focus :(OwmClient*)c;
