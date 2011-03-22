@@ -31,12 +31,11 @@ static char* atom_names[] = {
 	"SM_CLIENT_ID",
 	"WM_CLIENT_LEADER",
 	"WM_WINDOW_ROLE"
-};
-static char* net_atom_names[] = {
 	"_NET_SUPPORTED",
 	"_NET_WM_NAME",
 	"_NET_WM_STATE",
-	"_NET_WM_STATE_FULLSCREEN"
+	"_NET_WM_STATE_FULLSCREEN",
+    NULL
 };
 
 @implementation OwmCore
@@ -67,11 +66,14 @@ static char* net_atom_names[] = {
 {
 	OwmUtList *c;
 	OwmUtList *m;
-	for (m = _mons; NULL != m; m = [m next]) {
+	for (m = [self screenList]; NULL != m; m = [m next]) {
 		for (c = [[m get] getClients]; NULL != c; c = [c next]) {
 			if([[c get] getFrame] == w) {
 				return [c get];
 			}
+            else {
+                fprintf(stderr, "FFF NoMatch %x == %x\n", w, [[c get] getFrame]);
+            }
 		}
 	}
 	return NULL;
@@ -382,11 +384,6 @@ static char* net_atom_names[] = {
 	return _display;
 }
 
--(Atom)getNetAtom:(int)name
-{
-	return _netatom[name];
-}
-
 -(Atom)getWmAtom:(int)name
 {
 	return _wmatom[name];
@@ -442,12 +439,12 @@ static char* net_atom_names[] = {
 	_sh = DisplayHeight(_display, _screen);
 	_bh = 24;
 	[self updateGeom];
-	XInternAtoms(_display, 
-			atom_names, sizeof _wmatom / sizeof _wmatom[0], False, _wmatom);
-	XInternAtoms(_display, 
-			net_atom_names, sizeof _netatom / sizeof _netatom[0], False, _netatom);
+    
+    int i = 0;
+    for ( ; NULL != atom_names[i]; ++i) {
+        _wmatom[i] = XInternAtom(_display, atom_names[i], False);
+    }
 
-	
 	_dc.norm[ColBorder] = [self createColor :normbordercolor];
 	_dc.norm[ColBG] = [self createColor :normbgcolor];
 	_dc.norm[ColFG] = [self createColor :normfgcolor];
@@ -462,8 +459,8 @@ static char* net_atom_names[] = {
 	XSetLineAttributes(_display, _dc.gc, 1, LineSolid, CapButt, JoinMiter);
 
 	//[self updateBorders];
-	XChangeProperty(_display, _root, _netatom[Xn_NET_SUPPORTED], XA_ATOM, 32,
-						PropModeReplace, (unsigned char *) _netatom, Xn_NET_MAX);
+	//XChangeProperty(_display, _root, _wmatom[Xn_NET_SUPPORTED], XA_ATOM, 32,
+	//					PropModeReplace, (unsigned char *) _netatom, Xn_NET_MAX);
 
 	wa.cursor = XCreateFontCursor(_display, XC_left_ptr);
 	wa.event_mask = SubstructureRedirectMask 
@@ -518,6 +515,7 @@ static char* net_atom_names[] = {
 		if(NULL == (c = [self findClient: ev->window])) {
 			fprintf(stderr, "client not match\n");
 		}
+        fprintf(stderr, "Unknowon Window: %x\n", ev->window);
 		return self;
 	}
 	
@@ -557,10 +555,11 @@ static char* net_atom_names[] = {
 	OwmClient* c = [self findClient :ev->window];
 	if(NULL == c) {
 		fprintf(stderr, "UnmapNotify: not match\n");
+        return self;
 	}
-	else {
-		fprintf(stderr, "UnmapNotify: match\n");
-	}
+	
+	fprintf(stderr, "UnmapNotify: match\n");
+    //[c reparent];
 }
 
 -run 

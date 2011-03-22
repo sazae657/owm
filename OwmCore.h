@@ -19,7 +19,6 @@
 	int			_sh;
 	int			_bh;
 	Atom		_wmatom[Xs_ATOM_MAX];
-	Atom		_netatom[Xn_NET_MAX];
 	//OwmScreen	*_mons;
 	OwmScreen	*_prmScr;
 	OwmUtList	*_mons;
@@ -41,7 +40,6 @@
 -(Display*)getDisplay;
 -(OwmClient*)findClient :(Window)w;
 -(OwmClient*)findClientByFrame :(Window)w;
--(Atom)getNetAtom:(int)name;
 -(Atom)getWmAtom:(int)name;
 -onMapRequest:(XEvent*)e;
 -onMouseButtonPress:(XEvent*)e;

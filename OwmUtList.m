@@ -12,7 +12,9 @@
 -add :(id)item
 {
 	OwmUtListRec* rec = NULL; 
-	
+    
+    fprintf(stderr, "add %x\n", [item hash]);
+
 	if (NULL == (rec = (OwmUtListRec*)malloc(sizeof(OwmUtListRec)))) {
 		return NULL;
 	}
@@ -35,6 +37,9 @@
 		}
 		_end = rec;
 	}
+    if (NULL == _cursor) {
+        [self reset]; 
+    }
 	return self;
 }
 
@@ -48,7 +53,7 @@
 
 -(id)next
 {	
-	if(NULL != _cursor) {
+	if (NULL != _cursor) {
 		_cursor = _cursor->next;
 		return self;
 	}

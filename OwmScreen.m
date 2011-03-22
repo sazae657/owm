@@ -62,7 +62,7 @@
 
 -(OwmUtList*)getClients
 {
-	return _clients;
+	return [_clients reset];
 }
 
 @end

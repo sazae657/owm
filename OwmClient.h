@@ -31,7 +31,7 @@
 -(Bool)getWindowText :(char *)text :(unsigned int) size;
 
 -sendClientMessage:(Atom)at :(long)x;
-
+-reparent;
 -grabStart;
 -grabEnd;
 

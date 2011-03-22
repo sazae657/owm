@@ -29,7 +29,7 @@
 	if(!text || size == 0)
 		return False;
 	text[0] = '\0';
-	if(!XGetTextProperty([_core getDisplay], _win, &name, [_core getNetAtom :Xn_NET_WM_NAME])) {
+	if(!XGetTextProperty([_core getDisplay], _win, &name, [_core getWmAtom :Xn_NET_WM_NAME])) {
 		XGetTextProperty([_core getDisplay], _win, &name, XA_WM_NAME);
 	}
 	if(!name.nitems)
@@ -147,8 +147,10 @@
 	XSetWindowBorderWidth([_core getDisplay], _win, 0);
 	XReparentWindow([_core getDisplay], _win, _frame, 19, 19);
 	XAddToSaveSet([_core getDisplay], _win);
+	XMapRaised([_core getDisplay], _frame);
 	XMapWindow([_core getDisplay], _win);
-	XMapWindow([_core getDisplay], _frame);
+    
+    fprintf(stderr, "Manage Window: F=%x W=%x\n",_frame, _win);
 }
 
 -sendConfigure
@@ -228,7 +230,7 @@
 			False, 
 			ButtonPressMask|ButtonReleaseMask|ButtonMotionMask,
 			GrabModeAsync,GrabModeAsync, None, cursor, CurrentTime);
-	XMapRaised([_core getDisplay], _frame);
+	//XMapRaised([_core getDisplay], _frame);
 }
 
 -grabEnd
@@ -238,10 +240,10 @@
 	
 	[_core getRootPointer :&x :&y];
 	XMoveWindow([_core getDisplay], _frame , x, y);
-	XMapSubwindows([_core getDisplay], _frame);
-	[self sendClientMessage 
+	//XMapSubwindows([_core getDisplay], _frame);
+	/*[self sendClientMessage 
 		:[_core getWmAtom :Xs_WM_PROTOCOLS]
-		:[_core getWmAtom :Xs_WM_TAKE_FOCUS]];
+		:[_core getWmAtom :Xs_WM_TAKE_FOCUS]];*/
 	return self;
 }
 
@@ -269,6 +271,14 @@
 	}
 }
 
+-reparent
+{
+    XUnmapWindow([_core getDisplay], _frame);
+    XReparentWindow([_core getDisplay], _win, [_core rootWindow], _wndRect.x, _wndRect.y);
+    XRemoveFromSaveSet([_core getDisplay], _win);
+	XSync([_core getDisplay], False);
+    return self;
+}
 
 @end
 
